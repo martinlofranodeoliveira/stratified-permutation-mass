@@ -1,0 +1,58 @@
+name: Native offline gates
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record runner identity and prepare official dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          printf 'image=%s\nimage_version=%s\narchitecture=%s\nsource_sha=%s\n' \
+            "${ImageOS:-unknown}" "${ImageVersion:-unknown}" "$(uname -m)" "$GITHUB_SHA" | tee build/runner.txt
+          docker build --target test --tag spm-check . 2>&1 | tee build/preparation.log
+      - name: Offline native build, strict check and fresh installation
+        shell: bash
+        run: |
+          set -uo pipefail
+          docker run --name spm-check-evidence --network none --user 1000:1000 \
+            --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
+            --memory 1g --cpus 2 spm-check 2>&1 | tee build/gates.log
+          status=${PIPESTATUS[0]}
+          printf 'offline_gate_exit=%s\n' "$status" | tee build/gate-exit.txt
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          docker cp spm-check-evidence:/work/build/stratapermexact_0.1.0.tar.gz build/
+          docker cp spm-check-evidence:/work/build/source-package.sha256 build/
+          docker cp spm-check-evidence:/work/build/stratapermexact.Rcheck build/
+      - name: Prepare source-free runtime from checked source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd build && sha256sum --check --strict source-package.sha256)
+          docker build --target runtime --tag spm-runtime . 2>&1 | tee build/runtime-preparation.log
+      - name: Offline independent consumer without compiler or checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          consumer="$(cat tools/consumer.R)"
+          docker run --network none --user 1000:1000 --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 256 --memory 1g --cpus 2 \
+            --env SPM_EXPECT_LIBRARY=/opt/spm-library --entrypoint Rscript \
+            spm-runtime --vanilla -e "$consumer" 2>&1 | tee build/consumer.log
+          docker run --network none --user 1000:1000 --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 256 --memory 1g --cpus 2 \
+            spm-runtime demo --assert 2>&1 | tee build/demo.txt
+          docker run --network none --user 1000:1000 --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 256 --memory 1g --cpus 2 \
+            spm-runtime demo --assert --tsv | tee build/demo.tsv
+          test "$(tail -n 1 build/demo.tsv)" = $'END\t5'
+          printf '%s\n' 'consumer_exit=0' 'demo_exit=0' > build/runtime-exits.txt

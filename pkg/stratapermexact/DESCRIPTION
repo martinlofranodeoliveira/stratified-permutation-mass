@@ -1,0 +1,21 @@
+Package: stratapermexact
+Type: Package
+Title: Bounded Exact Stratified Assignment Masses
+Version: 0.1.0
+Authors@R: c(person("Lofrano Tecnologia", role = c("aut", "cph")),
+    person("Martin", "Lofrano", role = "cre",
+    email = "108959625+martinlofranodeoliveira@users.noreply.github.com"))
+Description: Computes exact integer masses for uniformly weighted two-label
+    assignments preserving supplied stratum selection counts. Original
+    selected-count and score dynamic programming is followed by exact
+    convolution. Explicit cell and update budgets prevent publication of
+    partial normalized distributions. Arbitrary-precision integer and
+    rational arithmetic is provided by the maintained 'gmp' package.
+License: MIT + file LICENSE
+URL: https://github.com/martinlofranodeoliveira/stratified-permutation-mass,
+    https://lofranotecnologia.com.br
+BugReports: https://github.com/martinlofranodeoliveira/stratified-permutation-mass/issues
+Depends: R (>= 4.5.0)
+Imports: gmp (>= 0.7-5), methods
+Encoding: UTF-8
+NeedsCompilation: no

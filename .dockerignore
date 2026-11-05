@@ -1,0 +1,7 @@
+.git
+*.Rcheck
+.Rhistory
+.RData
+.Rproj.user
+build/*
+!build/stratapermexact_0.1.0.tar.gz
